@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard • Sambhav Security Lab</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="page-shell">
+        <nav class="navbar">
+            <div class="badge">👤 Logged in as <strong><%= user.username %></strong> (<%= user.role %>)</div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/blackbox">Black Box</a>
+                <a href="/admin">Admin</a>
+                <a href="/profile/<%= user.id %>">Profile</a>
+                <a href="/logout">Logout</a>
+            </div>
+        </nav>
+
+        <header class="hero-card" style="margin-bottom:32px;">
+            <h1 class="hero-title" style="font-size:2.2rem;">Mission Control</h1>
+            <p class="hero-subtitle">Experiment with XSS, SQLi, IDOR, and more inside an India-themed training ground.</p>
+            <p>Analyse user data, search vulnerable posts, drop malicious payloads in comments, or tamper with file uploads. Track
+                every exploit path from a single dashboard.</p>
+            <% if (flag) { %>
+                <div class="hero-tag" style="margin-top:18px;">🚩 Dashboard Flag: <strong><%= flag %></strong></div>
+            <% } %>
+        </header>
+
+        <% if (learningModules && learningModules.length) { %>
+        <section>
+            <h2 class="section-title">🎓 Learning Studio</h2>
+            <p class="section-subtitle">Explore why each flaw is dangerous, review intentionally vulnerable snippets, and try your hand at patching them before comparing with a reference fix.</p>
+            <div class="grid learning-grid">
+                <% learningModules.forEach(function(module) { %>
+                <article class="card learning-card" data-module-id="<%= module.id %>">
+                    <header class="learning-header">
+                        <span class="learning-tag">Module</span>
+                        <h3><%= module.title %></h3>
+                    </header>
+                    <div class="learning-body">
+                        <div class="learning-block">
+                            <h4>Vulnerable snippet</h4>
+                            <pre class="code-box"><code><%- module.vulnerableSnippet %></code></pre>
+                        </div>
+                        <div class="learning-grid-two">
+                            <div class="learning-block">
+                                <h4>Why it breaks</h4>
+                                <p><%= module.explanation %></p>
+                            </div>
+                            <div class="learning-block">
+                                <h4>Secure coding principle</h4>
+                                <p><%= module.mitigation %></p>
+                            </div>
+                        </div>
+                        <div class="learning-block">
+                            <h4>Patch playground</h4>
+                            <p class="learning-helper">Write or paste a fix. When you check your work we will look for the secure building blocks described above.</p>
+                            <textarea class="patch-input" data-module-id="<%= module.id %>" rows="6" placeholder="<%- module.patchTemplate %>"><%- module.patchTemplate %></textarea>
+                            <div class="learning-actions">
+                                <button class="btn patch-check" type="button" data-module-id="<%= module.id %>">Check patch</button>
+                                <div class="alert patch-feedback" data-module-id="<%= module.id %>" style="display:none;"></div>
+                            </div>
+                        </div>
+                        <details class="learning-reference">
+                            <summary>Need a hint or want to compare with a patch?</summary>
+                            <pre class="code-box"><code><%- module.referencePatch %></code></pre>
+                        </details>
+                    </div>
+                </article>
+                <% }); %>
+            </div>
+        </section>
+        <% } %>
+
+        <section>
+            <h2 class="section-title">👥 User Enumeration</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Profile</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% allUsers.forEach(function(u) { %>
+                        <tr>
+                            <td><%= u.id %></td>
+                            <td><%= u.username %></td>
+                            <td><%= u.email %></td>
+                            <td><%= u.role %></td>
+                            <td><a href="/profile/<%= u.id %>">View</a></td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2 class="section-title">🕵️ Vulnerable Search</h2>
+            <form id="searchForm" class="grid" style="grid-template-columns: minmax(240px, 1fr) auto; align-items:center;">
+                <input type="text" name="q" id="searchInput" placeholder="Try ' OR '1'='1" required>
+                <button class="btn" type="submit">Run Query</button>
+            </form>
+            <div id="searchResults" class="grid challenge-grid" style="margin-top:20px;"></div>
+        </section>
+
+        <section>
+            <h2 class="section-title">💬 Comment Playground</h2>
+            <form id="commentForm" class="grid" style="grid-template-columns: 1fr auto; align-items:flex-end;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label for="comment">Comment</label>
+                    <textarea id="comment" name="comment" rows="3" placeholder="<script>alert('Namaste Bharat')</script>"></textarea>
+                </div>
+                <button class="btn" type="submit">Post</button>
+            </form>
+            <div class="comment-box" id="commentList">
+                <% comments.forEach(function(comment) { %>
+                    <div class="comment">
+                        <div><%- comment.content %></div>
+                        <small>Posted by <%= comment.author || 'anonymous' %> on <%= comment.created_at %></small>
+                    </div>
+                <% }); %>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-title">📁 File Upload Mischief</h2>
+            <form id="uploadForm" class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:16px;">
+                <div class="form-group">
+                    <label for="filename">Filename</label>
+                    <input type="text" id="filename" name="filename" placeholder="../../etc/passwd">
+                </div>
+                <div class="form-group">
+                    <label for="content">File Content</label>
+                    <textarea id="content" name="content" rows="3">Backdoor payload</textarea>
+                </div>
+                <button class="btn" type="submit">Upload</button>
+            </form>
+            <div id="uploadMessage" class="alert" style="display:none;"></div>
+        </section>
+
+        <section>
+            <h2 class="section-title">📰 Recent Posts</h2>
+            <div class="grid challenge-grid">
+                <% posts.forEach(function(post) { %>
+                    <article class="card">
+                        <h3><%= post.title %></h3>
+                        <div><%- post.content %></div>
+                        <p style="margin-top:12px;">By <strong><%= post.author || 'unknown' %></strong></p>
+                    </article>
+                <% }); %>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-title">💸 Insecure Transfer Console</h2>
+            <form id="transferForm" class="grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; align-items: end;">
+                <div class="form-group">
+                    <label for="fromAccount">From Account</label>
+                    <input type="text" id="fromAccount" name="fromAccount" value="<%= user.username %>">
+                </div>
+                <div class="form-group">
+                    <label for="toAccount">To Account</label>
+                    <input type="text" id="toAccount" name="toAccount" placeholder="admin">
+                </div>
+                <div class="form-group">
+                    <label for="amount">Amount</label>
+                    <input type="number" id="amount" name="amount" value="1500">
+                </div>
+                <button class="btn" type="submit">Push Transfer</button>
+            </form>
+            <pre id="transferResult" class="code-box" style="margin-top:16px; white-space:pre-wrap;"></pre>
+        </section>
+
+        <section>
+            <h2 class="section-title">🧩 Legacy Merge Playground</h2>
+            <p>Prototype pollution lurks inside an unpatched lodash <code>merge</code> helper. Supply raw JSON to tamper with future objects.</p>
+            <form id="mergeForm" class="grid" style="grid-template-columns: 1fr auto; align-items: flex-end;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label for="payload">JSON Payload</label>
+                    <textarea id="payload" name="payload" rows="4">{"__proto__":{"flag":"CTF{demo}"}}</textarea>
+                </div>
+                <button class="btn" type="submit">Merge</button>
+            </form>
+            <pre id="mergeResult" class="code-box" style="margin-top:16px; white-space:pre-wrap;"></pre>
+        </section>
+
+        <section>
+            <h2 class="section-title">🔐 2FA Bypass Lab</h2>
+            <p>Master OTP codes and the remember device toggle let you skip multi-factor enforcement.</p>
+            <form id="bypassForm" class="grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:16px; align-items:end;">
+                <div class="form-group">
+                    <label for="otpUser">Username</label>
+                    <input type="text" id="otpUser" name="username" value="admin">
+                </div>
+                <div class="form-group">
+                    <label for="otpCode">OTP Code</label>
+                    <input type="text" id="otpCode" name="otp" placeholder="0000">
+                </div>
+                <div class="form-group" style="flex-direction:row; align-items:center; gap:8px;">
+                    <input type="checkbox" id="rememberDevice" name="rememberDevice">
+                    <label for="rememberDevice" style="margin-bottom:0;">Remember Device</label>
+                </div>
+                <button class="btn" type="submit">Bypass</button>
+            </form>
+            <pre id="bypassResult" class="code-box" style="margin-top:16px; white-space:pre-wrap;"></pre>
+        </section>
+
+        <section>
+            <h2 class="section-title">🚚 Unsigned Config Importer</h2>
+            <p>Pipeline accepts any base64 encoded JSON without signature verification.</p>
+            <form id="configForm" class="grid" style="grid-template-columns: 1fr auto; align-items:flex-end;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label for="configJson">Config JSON</label>
+                    <textarea id="configJson" rows="4">{"flag":"CTF{demo_config}"}</textarea>
+                </div>
+                <button class="btn" type="submit">Import</button>
+            </form>
+            <pre id="configResult" class="code-box" style="margin-top:16px; white-space:pre-wrap;"></pre>
+        </section>
+
+        <section>
+            <h2 class="section-title">📉 Monitoring Blind Spot</h2>
+            <p>Critical alerts vanish inside a disabled SIEM. Trigger the gap.</p>
+            <form id="incidentForm" class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; align-items:end;">
+                <div class="form-group">
+                    <label for="incidentEvent">Event</label>
+                    <input type="text" id="incidentEvent" name="event" value="Admin password spray detected">
+                </div>
+                <div class="form-group">
+                    <label for="incidentSeverity">Severity</label>
+                    <select id="incidentSeverity" name="severity">
+                        <option value="info">Info</option>
+                        <option value="warning">Warning</option>
+                        <option value="critical" selected>Critical</option>
+                    </select>
+                </div>
+                <button class="btn" type="submit">Send Alert</button>
+            </form>
+            <pre id="incidentResult" class="code-box" style="margin-top:16px; white-space:pre-wrap;"></pre>
+        </section>
+
+        <section>
+            <h2 class="section-title">🌐 SSRF Proxy</h2>
+            <p>Proxy makes server-side requests to arbitrary URLs, including <code>file://</code> paths.</p>
+            <form id="ssrfForm" class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:16px; align-items:end;">
+                <div class="form-group">
+                    <label for="ssrfTarget">Target URL</label>
+                    <input type="text" id="ssrfTarget" name="target" value="http://localhost:5000/debug">
+                </div>
+                <button class="btn" type="submit">Fetch</button>
+            </form>
+            <pre id="ssrfResult" class="code-box" style="margin-top:16px; white-space:pre-wrap;"></pre>
+        </section>
+    </div>
+
+    <script>
+        const searchForm = document.getElementById('searchForm');
+        const searchResults = document.getElementById('searchResults');
+        if (searchForm) {
+            searchForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const query = new URLSearchParams(new FormData(searchForm)).toString();
+                const response = await fetch(`/search?${query}`);
+                const data = await response.json();
+                searchResults.innerHTML = data.map((post) => `
+                    <article class="card">
+                        <h3>${post.title}</h3>
+                        <div>${post.content}</div>
+                        <p style="margin-top:12px;">By <strong>${post.author || 'unknown'}</strong></p>
+                    </article>
+                `).join('');
+            });
+        }
+
+        const commentForm = document.getElementById('commentForm');
+        const commentList = document.getElementById('commentList');
+        if (commentForm) {
+            commentForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const formData = new FormData(commentForm);
+                const response = await fetch('/comment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        comment: formData.get('comment'),
+                        postId: 1
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'comment';
+                    wrapper.innerHTML = `
+                        <div>${data.comment}</div>
+                        <small>Posted by ${data.username} just now</small>
+                    `;
+                    commentList.prepend(wrapper);
+                    commentForm.reset();
+                }
+            });
+        }
+
+        const patchButtons = document.querySelectorAll('.patch-check');
+        patchButtons.forEach((button) => {
+            button.addEventListener('click', async () => {
+                const moduleId = button.dataset.moduleId;
+                const textarea = document.querySelector(`.patch-input[data-module-id="${moduleId}"]`);
+                const feedback = document.querySelector(`.patch-feedback[data-module-id="${moduleId}"]`);
+
+                if (!textarea || !feedback) {
+                    return;
+                }
+
+                feedback.style.display = 'block';
+                feedback.className = 'alert patch-feedback';
+                feedback.textContent = 'Reviewing patch...';
+
+                try {
+                    const response = await fetch('/learn/patch-check', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            scenarioId: moduleId,
+                            patch: textarea.value
+                        })
+                    });
+
+                    const data = await response.json();
+                    feedback.className = 'alert patch-feedback ' + (data.success ? 'success' : 'error');
+                    feedback.textContent = data.message;
+                } catch (error) {
+                    feedback.className = 'alert patch-feedback error';
+                    feedback.textContent = 'We could not evaluate your patch. Try again.';
+                }
+            });
+        });
+
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadMessage = document.getElementById('uploadMessage');
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const formData = new FormData(uploadForm);
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: formData.get('filename'),
+                        content: formData.get('content')
+                    })
+                });
+                const data = await response.json();
+                uploadMessage.style.display = 'block';
+                uploadMessage.className = 'alert ' + (data.success ? 'success' : 'error');
+                uploadMessage.textContent = data.success ? `${data.message} ${data.flag ? 'Flag: ' + data.flag : ''}` : (data.error || 'Upload failed');
+            });
+        }
+
+        const transferForm = document.getElementById('transferForm');
+        const transferResult = document.getElementById('transferResult');
+        if (transferForm) {
+            transferForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const formData = new FormData(transferForm);
+                const response = await fetch('/transfer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fromAccount: formData.get('fromAccount'),
+                        toAccount: formData.get('toAccount'),
+                        amount: formData.get('amount')
+                    })
+                });
+                const data = await response.json();
+                transferResult.textContent = JSON.stringify(data, null, 2);
+            });
+        }
+
+        const mergeForm = document.getElementById('mergeForm');
+        const mergeResult = document.getElementById('mergeResult');
+        if (mergeForm) {
+            mergeForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const formData = new FormData(mergeForm);
+                const response = await fetch('/legacy-merge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ payload: formData.get('payload') })
+                });
+                const data = await response.json();
+                mergeResult.textContent = JSON.stringify(data, null, 2);
+            });
+        }
+
+        const bypassForm = document.getElementById('bypassForm');
+        const bypassResult = document.getElementById('bypassResult');
+        if (bypassForm) {
+            bypassForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const formData = new FormData(bypassForm);
+                const response = await fetch('/bypass-2fa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: formData.get('username'),
+                        otp: formData.get('otp'),
+                        rememberDevice: formData.get('rememberDevice') ? 'on' : 'off'
+                    })
+                });
+                const data = await response.json();
+                bypassResult.textContent = JSON.stringify(data, null, 2);
+            });
+        }
+
+        const configForm = document.getElementById('configForm');
+        const configResult = document.getElementById('configResult');
+        if (configForm) {
+            configForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const json = document.getElementById('configJson').value;
+                const encoded = window.btoa(unescape(encodeURIComponent(json)));
+                const response = await fetch('/import-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ config: encoded })
+                });
+                const data = await response.json();
+                configResult.textContent = JSON.stringify(data, null, 2);
+            });
+        }
+
+        const incidentForm = document.getElementById('incidentForm');
+        const incidentResult = document.getElementById('incidentResult');
+        if (incidentForm) {
+            incidentForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const formData = new FormData(incidentForm);
+                const response = await fetch('/report-incident', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        event: formData.get('event'),
+                        severity: formData.get('severity')
+                    })
+                });
+                const data = await response.json();
+                incidentResult.textContent = JSON.stringify(data, null, 2);
+            });
+        }
+
+        const ssrfForm = document.getElementById('ssrfForm');
+        const ssrfResult = document.getElementById('ssrfResult');
+        if (ssrfForm) {
+            ssrfForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const formData = new FormData(ssrfForm);
+                const response = await fetch('/fetch-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target: formData.get('target') })
+                });
+                const data = await response.json();
+                ssrfResult.textContent = JSON.stringify(data, null, 2);
+            });
+        }
+    </script>
+</body>
+</html>

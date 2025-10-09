@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sambhav Security Lab</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero-card">
+            <div class="hero-tag">🇮🇳 Crafted in the Colours of India</div>
+            <h1 class="hero-title">Sambhav Security Lab</h1>
+            <p class="hero-subtitle">Hands-on OWASP Top 10 dojo inspired by DVWA</p>
+            <p>Learn offensive and defensive security techniques in a vibrant tri-colour interface. This intentionally vulnerable
+                application is for red-team training and ethical hacking only.</p>
+        </header>
+
+        <nav class="navbar">
+            <div class="badge">🔐 OWASP Learning Platform</div>
+            <div class="nav-links">
+                <a href="/" class="active">Home</a>
+                <a href="/login">Login</a>
+                <a href="/register">Register</a>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/blackbox">Black Box</a>
+                <a href="/admin">Admin</a>
+                <a href="/debug">Debug</a>
+            </div>
+        </nav>
+
+        <% if (user) { %>
+            <div class="alert success">
+                🇮🇳 Welcome back, <strong><%= user.username %></strong>! You are logged in as <strong><%= user.role %></strong>.
+                Visit the <a href="/dashboard">dashboard</a> to continue exploring exploits or <a href="/logout">logout</a> when finished.
+            </div>
+        <% } else { %>
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: 28px;">
+                <a class="btn" href="/login">🚪 Login</a>
+                <a class="btn secondary" href="/register">📝 Register</a>
+            </div>
+        <% } %>
+
+        <section>
+            <h2 class="section-title">🎯 Featured CTF Challenges</h2>
+            <div class="grid challenge-grid">
+                <% challenges.forEach(function(challenge) { %>
+                    <article class="card">
+                        <span class="difficulty-chip <%= challenge.difficulty.toLowerCase() %>"><%= challenge.difficulty %></span>
+                        <h3><%= challenge.name %></h3>
+                        <p><%= challenge.description %></p>
+                        <p><strong>Target:</strong> <%= challenge.endpoint %></p>
+                        <p><strong>Flag:</strong> <%= challenge.flag %></p>
+                        <a class="btn" href="<%= challenge.endpoint %>">Start Challenge</a>
+                    </article>
+                <% }); %>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-title">🕵️ Black Box Bounty Grounds</h2>
+            <div class="card" style="padding:28px; display:flex; flex-direction:column; gap:12px;">
+                <p>Ready for an unlabelled Juice Shop-style experience? The Black Box area hosts hidden APIs, IDORs, SQL injection vectors, and SSRF gadgets without obvious hints. Recon the tri-colour UI, capture the mystery flags, then document your remediation strategy.</p>
+                <a class="btn" href="/blackbox">Enter Black Box</a>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-title">📚 OWASP Top 10 Quick Hits</h2>
+            <ul class="list-card">
+                <li>🇮🇳 <strong>A01 Broken Access Control</strong> — Pivot from user to admin and harvest IDOR leaks.</li>
+                <li>🇮🇳 <strong>A02 Cryptographic Failures</strong> — Decode unencrypted database backups and secrets.</li>
+                <li>🇮🇳 <strong>A03 Injection</strong> — Blend SQLi with persistent XSS inside tri-colour dashboards.</li>
+                <li>🇮🇳 <strong>A04 Insecure Design</strong> — Drain funds through missing approval workflows.</li>
+                <li>🇮🇳 <strong>A05 Security Misconfiguration</strong> — Mine verbose debug dumps and permissive CORS.</li>
+                <li>🇮🇳 <strong>A06 Vulnerable & Outdated Components</strong> — Poison legacy lodash merges for prototype pollution.</li>
+                <li>🇮🇳 <strong>A07 Identification & Auth Failures</strong> — Bypass OTP enforcement with shared master codes.</li>
+                <li>🇮🇳 <strong>A08 Software & Data Integrity Failures</strong> — Import unsigned configs to hijack the pipeline.</li>
+                <li>🇮🇳 <strong>A09 Security Logging & Monitoring Failures</strong> — Watch critical alerts disappear in the SOC void.</li>
+                <li>🇮🇳 <strong>A10 Server-Side Request Forgery</strong> — Use the SSRF proxy to read internal metadata.</li>
+            </ul>
+        </section>
+
+        <section class="alert">
+            <h3>⚠️ Security Disclaimer</h3>
+            <p>This lab is intentionally vulnerable. Run it only inside isolated networks or disposable environments. Respect
+                privacy, follow local laws, and use your skills for defensive training.</p>
+        </section>
+
+        <footer>
+            <p>Made for red-team education • Celebrate Secure Bharat 🇮🇳</p>
+        </footer>
+    </div>
+</body>
+</html>

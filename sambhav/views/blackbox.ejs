@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Black Box Grounds • Sambhav Security Lab</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="page-shell">
+        <nav class="navbar">
+            <div class="badge">🧪 Black Box Bounty Grounds</div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/blackbox" class="active">Black Box</a>
+                <a href="/logout">Logout</a>
+            </div>
+        </nav>
+
+        <header class="hero-card" style="margin-bottom:32px;">
+            <h1 class="hero-title" style="font-size:2.2rem;">Unknown Vulnerability Playground</h1>
+            <p class="hero-subtitle">Inspired by OWASP Juice Shop — hunt for hidden flaws without hand-holding.</p>
+            <p>Every card below hides an intentionally vulnerable workflow. Recon endpoints, fuzz parameters, and chain exploits to surface secret inventory notes, exfiltrate tokens, and pivot through internal services. Report back with mitigations once you snag the flags.</p>
+            <div class="hero-tag" style="margin-top:18px;">🎯 Active Hunter: <strong><%= user.username %></strong></div>
+        </header>
+
+        <section>
+            <h2 class="section-title">🧭 Hunt Briefings</h2>
+            <div class="grid mystery-grid">
+                <% blackboxPrompts.forEach(function(prompt) { %>
+                    <article class="mystery-card">
+                        <h3><%= prompt.label %></h3>
+                        <p><%= prompt.detail %></p>
+                    </article>
+                <% }); %>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-title">🛒 Inventory Intelligence Preview</h2>
+            <p class="section-subtitle">Only a slice of data is shown — tamper with the API to reveal the rest.</p>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% productPreview.forEach(function(product) { %>
+                        <tr>
+                            <td><%= product.id %></td>
+                            <td><%= product.name %></td>
+                            <td><%= product.category %></td>
+                            <td>₹<%= product.price %></td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2 class="section-title">📓 Exposed Note Vault Glimpses</h2>
+            <p class="section-subtitle">These teasers leak classifications — enumerate IDs to pull the juicy content.</p>
+            <div class="grid mystery-grid">
+                <% notePreview.forEach(function(note) { %>
+                    <article class="mystery-card">
+                        <span class="mystery-chip"><%= note.classification %></span>
+                        <h3>Note #<%= note.id %>: <%= note.title %></h3>
+                        <p>IDOR target? Try fetching <code>/blackbox/api/notes/<%= note.id %></code>.</p>
+                    </article>
+                <% }); %>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-title">🔍 Live Recon Console</h2>
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:16px;">
+                <div class="mystery-terminal">
+                    <h3>SQLi Inventory Search</h3>
+                    <p>Probe the product API like a blind SQL lab. Dump <code>inventory_note</code> fields for the flag.</p>
+                    <form id="blackboxSearchForm" class="grid" style="grid-template-columns: 1fr auto; gap:12px;">
+                        <input type="text" name="search" id="blackboxSearch" placeholder="' UNION SELECT ..." required>
+                        <button class="btn" type="submit">Query</button>
+                    </form>
+                    <div id="blackboxSearchResults" class="mystery-output"></div>
+                </div>
+                <div class="mystery-terminal">
+                    <h3>Note IDOR Fetcher</h3>
+                    <p>Request any note ID. Confidential classifications leak a hidden flag.</p>
+                    <form id="blackboxNoteForm" class="grid" style="grid-template-columns: 1fr auto; gap:12px;">
+                        <input type="number" name="noteId" id="blackboxNoteId" placeholder="5" min="1" required>
+                        <button class="btn" type="submit">Fetch</button>
+                    </form>
+                    <pre id="blackboxNoteResult" class="code-box" style="margin-top:12px; white-space:pre-wrap;"></pre>
+                </div>
+                <div class="mystery-terminal">
+                    <h3>Feedback Echo</h3>
+                    <p>Submit payloads to see how the lab handles bug reports. Stored responses are unescaped.</p>
+                    <form id="blackboxFeedbackForm" class="grid" style="grid-template-columns: 1fr; gap:12px;">
+                        <input type="email" name="email" id="blackboxEmail" placeholder="hunter@example.com">
+                        <textarea name="message" id="blackboxMessage" rows="3" placeholder="<script>alert('xss')</script>"></textarea>
+                        <button class="btn" type="submit">Send</button>
+                    </form>
+                    <div id="blackboxFeedbackStream" class="mystery-output"></div>
+                </div>
+                <div class="mystery-terminal">
+                    <h3>Diagnostics Proxy</h3>
+                    <p>Point the proxy anywhere — internal hosts, metadata services, or <code>file://</code> URIs.</p>
+                    <form id="blackboxDiagForm" class="grid" style="grid-template-columns: 1fr auto; gap:12px;">
+                        <input type="text" name="target" id="blackboxTarget" value="file:///etc/passwd">
+                        <button class="btn" type="submit">Send</button>
+                    </form>
+                    <pre id="blackboxDiagResult" class="code-box" style="margin-top:12px; white-space:pre-wrap;"></pre>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-title">🎒 Challenge Backlog</h2>
+            <div class="grid challenge-grid">
+                <% blackboxChallenges.forEach(function(challenge) { %>
+                    <article class="card">
+                        <h3><%= challenge.title %></h3>
+                        <p><%= challenge.description %></p>
+                        <p><strong>Endpoint:</strong> <code><%= challenge.endpoint %></code></p>
+                        <p class="section-subtitle" style="margin-top:12px;">Hint: <%= challenge.clue %></p>
+                    </article>
+                <% }); %>
+            </div>
+        </section>
+
+        <section class="alert" style="margin-top:32px;">
+            <h3>📘 Debrief Instructions</h3>
+            <p>Document the payloads you used, dump evidence for each captured flag, and draft mitigations. Tie your fixes back to OWASP categories just like a Juice Shop after-action report.</p>
+        </section>
+    </div>
+
+    <script>
+        const searchForm = document.getElementById('blackboxSearchForm');
+        const searchResults = document.getElementById('blackboxSearchResults');
+        if (searchForm) {
+            searchForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const params = new URLSearchParams(new FormData(searchForm));
+                const response = await fetch(`/blackbox/api/products?${params.toString()}`);
+                const data = await response.json();
+                const results = (data.products || []).map((product) => `
+                    <article class="card" style="margin-top:12px;">
+                        <h4>${product.name}</h4>
+                        <p>${product.description}</p>
+                        <p><strong>Inventory Note:</strong> ${product.inventory_note || '—'}</p>
+                        <small>Category: ${product.category} • Price: ₹${product.price}</small>
+                    </article>
+                `).join('');
+                searchResults.innerHTML = results || '<p>No products matched your query — try fuzzing further.</p>';
+                if (data.flag) {
+                    const flagBanner = document.createElement('div');
+                    flagBanner.className = 'alert success';
+                    flagBanner.textContent = `Flag captured: ${data.flag}`;
+                    searchResults.prepend(flagBanner);
+                }
+            });
+        }
+
+        const noteForm = document.getElementById('blackboxNoteForm');
+        const noteResult = document.getElementById('blackboxNoteResult');
+        if (noteForm) {
+            noteForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const formData = new FormData(noteForm);
+                const noteId = formData.get('noteId');
+                const response = await fetch(`/blackbox/api/notes/${noteId}`);
+                const data = await response.json();
+                if (data.error) {
+                    noteResult.textContent = data.error;
+                    return;
+                }
+                noteResult.textContent = JSON.stringify(data, null, 2);
+            });
+        }
+
+        const feedbackForm = document.getElementById('blackboxFeedbackForm');
+        const feedbackStream = document.getElementById('blackboxFeedbackStream');
+        if (feedbackForm) {
+            feedbackForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const payload = Object.fromEntries(new FormData(feedbackForm).entries());
+                const response = await fetch('/blackbox/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (data.error) {
+                    feedbackStream.innerHTML = `<div class="alert error">${data.error}</div>`;
+                    return;
+                }
+                const entry = document.createElement('div');
+                entry.innerHTML = data.echo;
+                feedbackStream.prepend(entry);
+                if (data.flag) {
+                    const flagBanner = document.createElement('div');
+                    flagBanner.className = 'alert success';
+                    flagBanner.textContent = `Flag captured: ${data.flag}`;
+                    feedbackStream.prepend(flagBanner);
+                }
+                feedbackForm.reset();
+            });
+        }
+
+        const diagForm = document.getElementById('blackboxDiagForm');
+        const diagResult = document.getElementById('blackboxDiagResult');
+        if (diagForm) {
+            diagForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const params = new URLSearchParams(new FormData(diagForm));
+                const response = await fetch(`/blackbox/api/diagnostics?${params.toString()}`);
+                const data = await response.json();
+                diagResult.textContent = data.error ? JSON.stringify(data, null, 2) : JSON.stringify(data, null, 2);
+            });
+        }
+    </script>
+</body>
+</html>
