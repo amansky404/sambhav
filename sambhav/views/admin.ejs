@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel • Sambhav Security Lab</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="page-shell">
+        <nav class="navbar">
+            <div class="badge">🧭 Admin Command Center</div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/logout">Logout</a>
+            </div>
+        </nav>
+
+        <header class="hero-card" style="margin-bottom:32px;">
+            <h1 class="hero-title" style="font-size:2.2rem;">Restricted Admin Panel</h1>
+            <p class="hero-subtitle">Demonstrating broken access control in a tri-colour experience.</p>
+            <p>Regular users shouldn’t be here — but due to intentionally weak authorization checks, they can view sensitive
+                information. Capture the flag and review exposed controls.</p>
+            <div class="hero-tag" style="margin-top:18px;">🚩 Admin Flag: <strong><%= flag %></strong></div>
+        </header>
+
+        <section>
+            <h2 class="section-title">👥 Full User Directory</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% allUsers.forEach(function(u) { %>
+                        <tr>
+                            <td><%= u.id %></td>
+                            <td><%= u.username %></td>
+                            <td><%= u.email %></td>
+                            <td><%= u.role %></td>
+                            <td><%= u.created_at %></td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="alert" style="margin-top:32px;">
+            <h3>🔎 Training Tip</h3>
+            <p>Use this panel to illustrate how sensitive admin functionality should be segmented. Add role-based checks, CSRF
+                tokens, and least privilege controls in secure environments.</p>
+        </section>
+    </div>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard • Sambhav Security Lab</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="page-shell">
+        <nav class="navbar">
+            <div class="badge">👤 Logged in as <strong><%= user.username %></strong> (<%= user.role %>)</div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/admin">Admin</a>
+                <a href="/profile/<%= user.id %>">Profile</a>
+                <a href="/logout">Logout</a>
+            </div>
+        </nav>
+
+        <header class="hero-card" style="margin-bottom:32px;">
+            <h1 class="hero-title" style="font-size:2.2rem;">Mission Control</h1>
+            <p class="hero-subtitle">Experiment with XSS, SQLi, IDOR, and more inside an India-themed training ground.</p>
+            <p>Analyse user data, search vulnerable posts, drop malicious payloads in comments, or tamper with file uploads. Track
+                every exploit path from a single dashboard.</p>
+            <% if (flag) { %>
+                <div class="hero-tag" style="margin-top:18px;">🚩 Dashboard Flag: <strong><%= flag %></strong></div>
+            <% } %>
+        </header>
+
+        <section>
+            <h2 class="section-title">👥 User Enumeration</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Profile</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% allUsers.forEach(function(u) { %>
+                        <tr>
+                            <td><%= u.id %></td>
+                            <td><%= u.username %></td>
+                            <td><%= u.email %></td>
+                            <td><%= u.role %></td>
+                            <td><a href="/profile/<%= u.id %>">View</a></td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2 class="section-title">🕵️ Vulnerable Search</h2>
+            <form id="searchForm" class="grid" style="grid-template-columns: minmax(240px, 1fr) auto; align-items:center;">
+                <input type="text" name="q" id="searchInput" placeholder="Try ' OR '1'='1" required>
+                <button class="btn" type="submit">Run Query</button>
+            </form>
+            <div id="searchResults" class="grid challenge-grid" style="margin-top:20px;"></div>
+        </section>
+
+        <section>
+            <h2 class="section-title">💬 Comment Playground</h2>
+            <form id="commentForm" class="grid" style="grid-template-columns: 1fr auto; align-items:flex-end;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label for="comment">Comment</label>
+                    <textarea id="comment" name="comment" rows="3" placeholder="<script>alert('Namaste Bharat')</script>"></textarea>
+                </div>
+                <button class="btn" type="submit">Post</button>
+            </form>
+            <div class="comment-box" id="commentList">
+                <% comments.forEach(function(comment) { %>
+                    <div class="comment">
+                        <div><%- comment.content %></div>
+                        <small>Posted by <%= comment.author || 'anonymous' %> on <%= comment.created_at %></small>
+                    </div>
+                <% }); %>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-title">📁 File Upload Mischief</h2>
+            <form id="uploadForm" class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:16px;">
+                <div class="form-group">
+                    <label for="filename">Filename</label>
+                    <input type="text" id="filename" name="filename" placeholder="../../etc/passwd">
+                </div>
+                <div class="form-group">
+                    <label for="content">File Content</label>
+                    <textarea id="content" name="content" rows="3">Backdoor payload</textarea>
+                </div>
+                <button class="btn" type="submit">Upload</button>
+            </form>
+            <div id="uploadMessage" class="alert" style="display:none;"></div>
+        </section>
+
+        <section>
+            <h2 class="section-title">📰 Recent Posts</h2>
+            <div class="grid challenge-grid">
+                <% posts.forEach(function(post) { %>
+                    <article class="card">
+                        <h3><%= post.title %></h3>
+                        <div><%- post.content %></div>
+                        <p style="margin-top:12px;">By <strong><%= post.author || 'unknown' %></strong></p>
+                    </article>
+                <% }); %>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const searchForm = document.getElementById('searchForm');
+        const searchResults = document.getElementById('searchResults');
+        if (searchForm) {
+            searchForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const query = new URLSearchParams(new FormData(searchForm)).toString();
+                const response = await fetch(`/search?${query}`);
+                const data = await response.json();
+                searchResults.innerHTML = data.map((post) => `
+                    <article class="card">
+                        <h3>${post.title}</h3>
+                        <div>${post.content}</div>
+                        <p style="margin-top:12px;">By <strong>${post.author || 'unknown'}</strong></p>
+                    </article>
+                `).join('');
+            });
+        }
+
+        const commentForm = document.getElementById('commentForm');
+        const commentList = document.getElementById('commentList');
+        if (commentForm) {
+            commentForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const formData = new FormData(commentForm);
+                const response = await fetch('/comment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        comment: formData.get('comment'),
+                        postId: 1
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'comment';
+                    wrapper.innerHTML = `
+                        <div>${data.comment}</div>
+                        <small>Posted by ${data.username} just now</small>
+                    `;
+                    commentList.prepend(wrapper);
+                    commentForm.reset();
+                }
+            });
+        }
+
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadMessage = document.getElementById('uploadMessage');
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const formData = new FormData(uploadForm);
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: formData.get('filename'),
+                        content: formData.get('content')
+                    })
+                });
+                const data = await response.json();
+                uploadMessage.style.display = 'block';
+                uploadMessage.className = 'alert ' + (data.success ? 'success' : 'error');
+                uploadMessage.textContent = data.success ? `${data.message} ${data.flag ? 'Flag: ' + data.flag : ''}` : (data.error || 'Upload failed');
+            });
+        }
+    </script>
+</body>
+</html>
