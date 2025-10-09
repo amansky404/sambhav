@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register • Sambhav Security Lab</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="page-shell">
+        <nav class="navbar">
+            <div class="badge">🛡️ Weak Authentication Training</div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/login">Login</a>
+                <a href="/dashboard">Dashboard</a>
+            </div>
+        </nav>
+
+        <section class="form-card">
+            <h1 class="section-title" style="margin-top:0;">📝 Register</h1>
+            <p>Create a test account to explore identification & authentication failures.</p>
+
+            <% if (typeof error !== 'undefined' && error) { %>
+                <div class="alert error"><%= error %></div>
+            <% } %>
+
+            <form action="/register" method="POST" class="grid">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="neo" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" placeholder="neo@matrix.io" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="123456" required>
+                    <small style="color: rgba(15, 44, 92, 0.7);">Passwords are stored in plain text to highlight OWASP A02 risks.</small>
+                </div>
+                <button class="btn" type="submit">Create Account</button>
+            </form>
+
+            <p class="form-footnote">Already have credentials? <a href="/login">Login instead</a></p>
+        </section>
+
+        <section class="alert" style="margin-top:32px;">
+            <h3>🎯 CTF Hint</h3>
+            <ul style="margin:0; padding-left:18px;">
+                <li>Reuse weak passwords and brute-force easily.</li>
+                <li>No rate limiting or email verification is enforced.</li>
+                <li>Usernames and emails are only superficially validated.</li>
+            </ul>
+            <p>Use these weaknesses to craft attacks and pivot into other OWASP challenge areas.</p>
+        </section>
+    </div>
+</body>
+</html>
