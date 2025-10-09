@@ -20,6 +20,12 @@ npm install
 npm start
 ```
 
+### Run smoke tests
+
+```bash
+npm test
+```
+
 The server boots on [http://localhost:5000](http://localhost:5000) by default and automatically initializes the SQLite database (`vulnerable_ctf.db`).
 
 ### Default Accounts

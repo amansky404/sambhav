@@ -22,6 +22,8 @@ const db = new sqlite3.Database(databasePath, (err) => {
     }
 });
 
+let isDbClosed = false;
+
 const connection = {
     query(sql, callback) {
         const trimmed = sql.trim().toLowerCase();
@@ -41,8 +43,25 @@ const connection = {
             callback(err, result);
         });
     },
-    close() {
-        db.close();
+    close(callback) {
+        if (isDbClosed) {
+            if (typeof callback === 'function') {
+                callback();
+            }
+            return;
+        }
+
+        db.close((err) => {
+            if (err) {
+                console.error('❌ Error closing database connection:', err.message);
+            } else {
+                isDbClosed = true;
+            }
+
+            if (typeof callback === 'function') {
+                callback(err);
+            }
+        });
     }
 };
 
@@ -128,13 +147,23 @@ const initDB = (callback) => {
             (5, 'Beta Credentials', 'beta-user / tasteTheJuice!', 'Confidential', 'qa');
     `;
 
-    db.exec(schema, (err) => {
-        if (err) {
-            console.error('❌ Failed to initialize database schema:', err.message);
-        } else {
+    return new Promise((resolve, reject) => {
+        db.exec(schema, (err) => {
+            if (err) {
+                console.error('❌ Failed to initialize database schema:', err.message);
+                if (typeof callback === 'function') {
+                    callback(err);
+                }
+                reject(err);
+                return;
+            }
+
             console.log('✅ Database initialized successfully');
-        }
-        callback(err);
+            if (typeof callback === 'function') {
+                callback(null);
+            }
+            resolve();
+        });
     });
 };
 
@@ -1048,17 +1077,16 @@ function getCTFChallenges() {
 // ===============================
 // SERVER INITIALIZATION
 // ===============================
-const startServer = () => {
+const startServer = (port = process.env.PORT || 5000) => {
     if (!fs.existsSync('uploads')) {
         fs.mkdirSync('uploads');
     }
 
-    const PORT = process.env.PORT || 5000;
-
-    app.listen(PORT, () => {
+    const server = app.listen(port, () => {
+        const actualPort = server.address().port;
         console.log(`
 🎯 Vulnerable CTF Application - FULLY FUNCTIONAL
-📍 Server running on: http://localhost:${PORT}
+📍 Server running on: http://localhost:${actualPort}
 
 📋 Available Routes:
    ✅ GET  /                 - Home page with CTF challenges
@@ -1101,16 +1129,46 @@ const startServer = () => {
     For educational use only in isolated environments!
         `);
     });
+
+    return server;
 };
 
-initDB(() => {
-    startServer();
+const shutdown = (server) => new Promise((resolve) => {
+    const finalize = () => {
+        connection.close(() => resolve());
+    };
+
+    if (server && typeof server.close === 'function') {
+        server.close(() => finalize());
+    } else {
+        finalize();
+    }
 });
 
-process.on('SIGINT', () => {
-    console.log('\n🛑 Shutting down server...');
-    connection.close();
-    process.exit(0);
+const bootstrap = () => initDB().then(() => {
+    const server = startServer();
+
+    process.on('SIGINT', () => {
+        console.log('\n🛑 Shutting down server...');
+        shutdown(server).then(() => process.exit(0));
+    });
+
+    return server;
 });
 
-module.exports = app;
+if (require.main === module) {
+    bootstrap().catch(() => {
+        connection.close(() => process.exit(1));
+    });
+}
+
+module.exports = {
+    app,
+    initDB,
+    startServer,
+    shutdown,
+    bootstrap,
+    connection
+};
+
+module.exports.default = app;

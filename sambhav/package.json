@@ -4,7 +4,8 @@
   "description": "Educational app with OWASP Top 10 vulnerabilities",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "test": "node tests/smoke.test.js"
   },
   "dependencies": {
     "body-parser": "^1.20.2",
