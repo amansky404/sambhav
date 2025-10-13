@@ -232,7 +232,33 @@ const learningModules = [
         referencePatch: `app.post('/login', (req, res) => {\n    const query = 'SELECT * FROM users WHERE username = ? AND password = ?';\n    connection.query({ sql: query, values: [req.body.username, req.body.password] }, (err, results = []) => {\n        if (err) {\n            return res.status(500).send('Login failed');\n        }\n        /* ... */\n    });\n});`,
         keywords: ['username = ?', 'password = ?', 'values'],
         successMessage: 'Nice! Binding the values closes out the injection window.',
-        retryMessage: 'Keep going—look for placeholder tokens and a values array to finish the hardening.'
+        retryMessage: 'Keep going—look for placeholder tokens and a values array to finish the hardening.',
+        patchChoices: [
+            {
+                key: 'A',
+                title: 'Parameterised credentials query',
+                description: 'Swap string concatenation for a prepared statement with bound username and password values.',
+                snippet: `app.post('/login', (req, res) => {\n    const query = 'SELECT * FROM users WHERE username = ? AND password = ?';\n    connection.query({ sql: query, values: [req.body.username, req.body.password] }, (err, results = []) => {\n        if (err) {\n            return res.status(500).send('Login failed');\n        }\n        if (results.length === 0) {\n            return res.status(401).send('Invalid credentials');\n        }\n        // Continue with login flow\n        res.send('Welcome back');\n    });\n});`
+            },
+            {
+                key: 'B',
+                title: 'Strip apostrophes only',
+                description: 'Manually removing quotes still leaves the statement injectable through other payload tricks.',
+                snippet: `app.post('/login', (req, res) => {\n    const username = (req.body.username || '').replace(/'/g, '');\n    const password = (req.body.password || '').replace(/'/g, '');\n    const query = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'";\n    connection.query(query, () => res.send('Login attempt logged.'));\n});`
+            },
+            {
+                key: 'C',
+                title: 'Client-side password hashing only',
+                description: 'Hashing input without changing the SQL statement fails to address injection completely.',
+                snippet: `app.post('/login', (req, res) => {\n    const hashed = require('crypto').createHash('md5').update(req.body.password || '').digest('hex');\n    const query = "SELECT * FROM users WHERE username = '" + req.body.username + "' AND password = '" + hashed + "'";\n    connection.query(query, (err) => {\n        if (err) {\n            return res.status(500).send('Login failed');\n        }\n        res.send('Login attempt recorded');\n    });\n});`
+            },
+            {
+                key: 'D',
+                title: 'Audit logging only',
+                description: 'Writing an audit entry without fixing the SQL keeps the core vulnerability open.',
+                snippet: `app.post('/login', (req, res) => {\n    console.log('Login for user', req.body.username);\n    const query = "SELECT * FROM users WHERE username = '" + req.body.username + "' AND password = '" + req.body.password + "'";\n    connection.query(query, () => res.send('Attempt noted'));\n});`
+            }
+        ]
     },
     {
         id: 'xss-comments',
@@ -244,7 +270,33 @@ const learningModules = [
         referencePatch: `app.post('/comment', (req, res) => {\n    const comment = req.body.comment || '';\n    const safeComment = comment\n        .replace(/</g, '&lt;')\n        .replace(/>/g, '&gt;');\n\n    comments.push({ content: safeComment });\n    res.redirect('/dashboard');\n});`,
         keywords: ['replace(/</g', '&lt;', '&gt;'],
         successMessage: 'Victory! Escaping angle brackets neutralises classic script payloads.',
-        retryMessage: 'Hint: encode both < and > so the browser refuses to execute injected markup.'
+        retryMessage: 'Hint: encode both < and > so the browser refuses to execute injected markup.',
+        patchChoices: [
+            {
+                key: 'A',
+                title: 'HTML encode user payload',
+                description: 'Replace < and > characters before storing so rendered output stays inert.',
+                snippet: `app.post('/comment', (req, res) => {\n    const comment = req.body.comment || '';\n    const safeComment = comment\n        .replace(/</g, '&lt;')\n        .replace(/>/g, '&gt;');\n\n    comments.push({ content: safeComment });\n    res.redirect('/dashboard');\n});`
+            },
+            {
+                key: 'B',
+                title: 'Strip script tags only',
+                description: 'Removing literal <script> tags still leaves other HTML contexts exploitable.',
+                snippet: `app.post('/comment', (req, res) => {\n    const comment = (req.body.comment || '').replace(/<script>/gi, '');\n    comments.push({ content: comment });\n    res.redirect('/dashboard');\n});`
+            },
+            {
+                key: 'C',
+                title: 'Store as base64 text',
+                description: 'Encoding before storing but decoding on render puts raw HTML back into the DOM.',
+                snippet: `app.post('/comment', (req, res) => {\n    const encoded = Buffer.from(req.body.comment || '', 'utf8').toString('base64');\n    comments.push({ content: Buffer.from(encoded, 'base64').toString('utf8') });\n    res.redirect('/dashboard');\n});`
+            },
+            {
+                key: 'D',
+                title: 'Log and continue',
+                description: 'Logging the payload without escaping it keeps the stored XSS alive.',
+                snippet: `app.post('/comment', (req, res) => {\n    console.log('Incoming comment:', req.body.comment);\n    comments.push({ content: req.body.comment });\n    res.redirect('/dashboard');\n});`
+            }
+        ]
     },
     {
         id: 'idor-profile',
@@ -256,7 +308,33 @@ const learningModules = [
         referencePatch: `app.get('/profile/:userId', (req, res) => {\n    if (!req.session.user) {\n        return res.status(401).render('error', { message: 'Login required' });\n    }\n\n    if (String(req.session.user.id) !== String(req.params.userId) && req.session.user.role !== 'admin') {\n        return res.status(403).render('error', { message: 'This profile is off-limits' });\n    }\n\n    const query = \`SELECT id, username, email, role, created_at FROM users WHERE id = \${req.params.userId}\`;\n    connection.query(query, (error, results = []) => {\n        if (error || results.length === 0) {\n            return res.status(404).render('error', { message: 'User not found' });\n        }\n\n        res.render('profile', {\n            profileUser: results[0],\n            currentUser: req.session.user,\n            flag: null\n        });\n    });\n});`,
         keywords: ['req.session.user', '403', 'admin'],
         successMessage: 'Great! Verifying the caller before revealing the profile shuts down the IDOR.',
-        retryMessage: 'Compare the requested userId against the active session (or require admin) to finish the fix.'
+        retryMessage: 'Compare the requested userId against the active session (or require admin) to finish the fix.',
+        patchChoices: [
+            {
+                key: 'A',
+                title: 'Enforce session ownership',
+                description: 'Confirm the requested profile matches the logged-in user or an administrator before returning data.',
+                snippet: `app.get('/profile/:userId', (req, res) => {\n    if (!req.session.user) {\n        return res.status(401).render('error', { message: 'Login required' });\n    }\n\n    if (String(req.session.user.id) !== String(req.params.userId) && req.session.user.role !== 'admin') {\n        return res.status(403).render('error', { message: 'This profile is off-limits' });\n    }\n\n    const query = \`SELECT id, username, email, role, created_at FROM users WHERE id = \${req.params.userId}\`;\n    connection.query(query, (error, results = []) => {\n        if (error || results.length === 0) {\n            return res.status(404).render('error', { message: 'User not found' });\n        }\n\n        res.render('profile', {\n            profileUser: results[0],\n            currentUser: req.session.user,\n            flag: null\n        });\n    });\n});`
+            },
+            {
+                key: 'B',
+                title: 'Hide sensitive fields only',
+                description: 'Redacting fields without an access check still discloses other users on demand.',
+                snippet: `app.get('/profile/:userId', (req, res) => {\n    const query = \`SELECT username FROM users WHERE id = \${req.params.userId}\`;\n    connection.query(query, (error, results = []) => {\n        if (error || results.length === 0) {\n            return res.status(404).render('error', { message: 'User not found' });\n        }\n        res.render('profile', { profileUser: results[0], currentUser: req.session.user, flag: null });\n    });\n});`
+            },
+            {
+                key: 'C',
+                title: 'Trust X-User header',
+                description: 'Relying on a spoofable header to pick the profile leaves the IDOR unchanged.',
+                snippet: `app.get('/profile/:userId', (req, res) => {\n    const assumedUser = req.get('X-User-Id');\n    if (!assumedUser) {\n        return res.status(400).render('error', { message: 'Missing user header' });\n    }\n    const query = \`SELECT * FROM users WHERE id = \${assumedUser}\`;\n    connection.query(query, (error, results = []) => {\n        res.render('profile', { profileUser: results[0], currentUser: req.session.user, flag: null });\n    });\n});`
+            },
+            {
+                key: 'D',
+                title: 'Cache the first profile',
+                description: 'Serving the first retrieved record ignores which ID was requested and still leaks other accounts.',
+                snippet: `app.get('/profile/:userId', (req, res) => {\n    connection.query('SELECT * FROM users LIMIT 1', (error, results = []) => {\n        res.render('profile', { profileUser: results[0], currentUser: req.session.user, flag: null });\n    });\n});`
+            }
+        ]
     }
 ];
 
@@ -735,11 +813,33 @@ app.post('/reset-password', (req, res) => {
 });
 
 app.get('/crypto-leak', (req, res) => {
-    res.json({
+    const payload = {
         message: 'Leaked database backup without encryption or key rotation',
         backup: sensitiveBackup,
         note: 'Data at rest must be encrypted. This backup is simply base64 encoded.',
         flag: 'CTF{CrYpt0_F41lur3}'
+    };
+
+    const wantsJson = req.query.format === 'json' || (req.headers.accept || '').includes('application/json');
+
+    if (wantsJson) {
+        return res.json(payload);
+    }
+
+    const decodedBackup = Buffer.from(sensitiveBackup, 'base64').toString('utf-8');
+    let decodedPretty = decodedBackup;
+
+    try {
+        decodedPretty = JSON.stringify(JSON.parse(decodedBackup), null, 2);
+    } catch (error) {
+        // Preserve raw string if parsing fails
+    }
+
+    res.render('crypto-leak', {
+        user: req.session.user,
+        leak: payload,
+        decodedBackup,
+        decodedPretty
     });
 });
 
@@ -876,10 +976,21 @@ app.post('/report-incident', (req, res) => {
 });
 
 app.get('/audit-log', (req, res) => {
-    res.json({
+    const payload = {
         storedEvents: auditTrail,
         monitoring: 'Real-time alerting disabled for performance reasons',
         flag: auditTrail.length === 0 ? 'CTF{L0gg1ng_G4p_Revealed}' : null
+    };
+
+    const wantsJson = req.query.format === 'json' || (req.headers.accept || '').includes('application/json');
+
+    if (wantsJson) {
+        return res.json(payload);
+    }
+
+    res.render('audit-log', {
+        user: req.session.user,
+        audit: payload
     });
 });
 
@@ -940,12 +1051,26 @@ app.post('/fetch-url', (req, res) => {
 });
 
 app.get('/debug', (req, res) => {
-    res.json({
+    const payload = {
         sessions: userSessions,
         fileUploads: fileUploads,
         totalUsers: Object.keys(userSessions).length,
         serverTime: new Date(),
         flag: 'CTF{D3bug_3ndp01nt_3xp0s3d}'
+    };
+
+    const wantsJson = req.query.format === 'json' || (req.headers.accept || '').includes('application/json');
+
+    if (wantsJson) {
+        return res.json(payload);
+    }
+
+    res.render('debug', {
+        user: req.session.user,
+        debugData: {
+            ...payload,
+            serverTime: payload.serverTime.toISOString()
+        }
     });
 });
 

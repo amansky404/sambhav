@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Console • Sambhav Security Lab</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="page-shell">
+        <nav class="navbar">
+            <div class="badge">🛠️ Verbose Debug Endpoint</div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/login">Login</a>
+                <a href="/register">Register</a>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/blackbox">Black Box</a>
+                <a href="/crypto-leak">Crypto Leak</a>
+                <a href="/audit-log">Audit Log</a>
+                <a href="/debug" class="active">Debug</a>
+            </div>
+        </nav>
+
+        <header class="hero-card" style="margin-bottom:32px;">
+            <div class="hero-tag">OWASP A05 • Security Misconfiguration</div>
+            <h1 class="hero-title" style="font-size:2.2rem;">Admin Console Exposure</h1>
+            <p class="hero-subtitle">Everything the server knows — sessions, uploads, and secrets — leaks here without auth.</p>
+            <p>Use the playground to inspect live session memory, exported file paths, and even capture the debug flag.</p>
+            <div class="hero-tag" style="margin-top:18px;">🚩 Flag: <strong><%= debugData.flag %></strong></div>
+        </header>
+
+        <section>
+            <h2 class="section-title">📊 Live Metrics</h2>
+            <div class="data-grid" id="debugMetrics">
+                <article class="data-card compact">
+                    <h3>Total Tracked Sessions</h3>
+                    <p class="metric-value" id="metricSessions"><%= Object.keys(debugData.sessions || {}).length %></p>
+                </article>
+                <article class="data-card compact">
+                    <h3>Upload Records</h3>
+                    <p class="metric-value" id="metricUploads"><%= (debugData.fileUploads || []).length %></p>
+                </article>
+                <article class="data-card compact">
+                    <h3>Server Time (UTC)</h3>
+                    <p class="metric-value" id="metricServerTime"><%= debugData.serverTime %></p>
+                </article>
+            </div>
+            <div class="data-actions" style="margin-top:20px;">
+                <button class="btn" type="button" id="refreshDebug">Refresh Snapshot</button>
+                <a class="btn secondary" href="/debug?format=json" target="_blank" rel="noopener">View Raw Endpoint</a>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-title">🧑‍💻 Active Sessions</h2>
+            <div class="card data-card" id="sessionList">
+                <% const sessionEntries = Object.entries(debugData.sessions || {}); %>
+                <% if (sessionEntries.length) { %>
+                    <div class="data-grid">
+                        <% sessionEntries.forEach(function(entry) { const sessionId = entry[0]; const payload = entry[1] || {}; %>
+                            <article class="data-card compact">
+                                <h3>Session <%= sessionId %></h3>
+                                <p><strong>User:</strong> <%= payload.username || 'unknown' %></p>
+                                <p><strong>Role:</strong> <%= payload.role || 'user' %></p>
+                                <p><strong>Raw:</strong> <code><%= JSON.stringify(payload) %></code></p>
+                            </article>
+                        <% }); %>
+                    </div>
+                <% } else { %>
+                    <div class="alert">No in-memory sessions yet — login to populate this leak.</div>
+                <% } %>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-title">📁 Uploaded Files</h2>
+            <div class="card data-card" id="uploadList">
+                <% if (debugData.fileUploads && debugData.fileUploads.length) { %>
+                    <div class="data-grid">
+                        <% debugData.fileUploads.forEach(function(file) { %>
+                            <article class="data-card compact">
+                                <h3><%= file.filename %></h3>
+                                <p><strong>Owner:</strong> <%= file.user %></p>
+                                <p><strong>Stored at:</strong> <code><%= file.path %></code></p>
+                                <p><strong>Uploaded:</strong> <%= file.uploadedAt %></p>
+                            </article>
+                        <% }); %>
+                    </div>
+                <% } else { %>
+                    <div class="alert">No uploads recorded. Try the file upload lab on the dashboard.</div>
+                <% } %>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-title">🧾 Raw JSON Dump</h2>
+            <div class="card data-card">
+                <pre class="code-box code-scroll" id="debugJson"><%= JSON.stringify(debugData, null, 2) %></pre>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const refreshDebug = document.getElementById('refreshDebug');
+        const metricSessions = document.getElementById('metricSessions');
+        const metricUploads = document.getElementById('metricUploads');
+        const metricServerTime = document.getElementById('metricServerTime');
+        const sessionList = document.getElementById('sessionList');
+        const uploadList = document.getElementById('uploadList');
+        const debugJson = document.getElementById('debugJson');
+
+        const renderSessions = (sessions) => {
+            const entries = Object.entries(sessions || {});
+            if (!sessionList) {
+                return;
+            }
+            if (!entries.length) {
+                sessionList.innerHTML = '<div class="alert">No in-memory sessions yet — login to populate this leak.</div>';
+                return;
+            }
+            sessionList.innerHTML = `
+                <div class="data-grid">
+                    ${entries.map(([sessionId, payload]) => `
+                        <article class="data-card compact">
+                            <h3>Session ${sessionId}</h3>
+                            <p><strong>User:</strong> ${(payload && payload.username) || 'unknown'}</p>
+                            <p><strong>Role:</strong> ${(payload && payload.role) || 'user'}</p>
+                            <p><strong>Raw:</strong> <code>${JSON.stringify(payload || {})}</code></p>
+                        </article>
+                    `).join('')}
+                </div>
+            `;
+        };
+
+        const renderUploads = (uploads) => {
+            if (!uploadList) {
+                return;
+            }
+            if (!uploads || !uploads.length) {
+                uploadList.innerHTML = '<div class="alert">No uploads recorded. Try the file upload lab on the dashboard.</div>';
+                return;
+            }
+            uploadList.innerHTML = `
+                <div class="data-grid">
+                    ${uploads.map((file) => `
+                        <article class="data-card compact">
+                            <h3>${file.filename}</h3>
+                            <p><strong>Owner:</strong> ${file.user}</p>
+                            <p><strong>Stored at:</strong> <code>${file.path}</code></p>
+                            <p><strong>Uploaded:</strong> ${file.uploadedAt}</p>
+                        </article>
+                    `).join('')}
+                </div>
+            `;
+        };
+
+        const renderDebug = (payload) => {
+            metricSessions.textContent = Object.keys(payload.sessions || {}).length;
+            metricUploads.textContent = (payload.fileUploads || []).length;
+            metricServerTime.textContent = payload.serverTime;
+            renderSessions(payload.sessions);
+            renderUploads(payload.fileUploads);
+            debugJson.textContent = JSON.stringify(payload, null, 2);
+        };
+
+        if (refreshDebug) {
+            refreshDebug.addEventListener('click', async () => {
+                const response = await fetch('/debug?format=json', {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await response.json();
+                renderDebug(data);
+            });
+        }
+    </script>
+</body>
+</html>
