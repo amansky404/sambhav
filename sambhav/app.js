@@ -8,6 +8,7 @@ const http = require('http');
 const https = require('https');
 const _ = require('lodash');
 const sqlite3 = require('sqlite3').verbose();
+const jwt = require('jsonwebtoken');
 
 const app = express();
 
@@ -949,6 +950,274 @@ app.get('/debug', (req, res) => {
     });
 });
 
+// ===============================
+// ADVANCED RED TEAM CHALLENGES
+// ===============================
+
+// A11: XML External Entity (XXE) Attack
+app.post('/api/xml-parser', isAuthenticated, (req, res) => {
+    const xmlData = req.body.xml || '';
+    
+    if (!xmlData) {
+        return res.status(400).json({ error: 'XML data required' });
+    }
+
+    // Vulnerable XML parsing that allows XXE
+    try {
+        // Simulating vulnerable XML parser behavior
+        const hasExternalEntity = /<!ENTITY/.test(xmlData) && /SYSTEM/.test(xmlData);
+        const hasFileRead = /file:\/\//.test(xmlData);
+        
+        if (hasExternalEntity && hasFileRead) {
+            return res.json({
+                success: true,
+                message: 'XML parsed successfully with external entities',
+                flag: 'CTF{XXE_F1l3_R34d_Succ3ss}',
+                data: 'Simulated external entity data loaded'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'XML parsed',
+            data: xmlData
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'XML parsing failed', details: error.message });
+    }
+});
+
+// A12: Server-Side Template Injection (SSTI)
+app.post('/api/render-template', isAuthenticated, (req, res) => {
+    const { template, name = 'User' } = req.body;
+    
+    if (!template) {
+        return res.status(400).json({ error: 'Template string required' });
+    }
+
+    try {
+        // Vulnerable template rendering - evaluates user input
+        const dangerousPatterns = ['eval', 'require', 'process', 'child_process'];
+        const containsDangerous = dangerousPatterns.some(pattern => template.includes(pattern));
+        
+        if (containsDangerous) {
+            return res.json({
+                success: true,
+                rendered: 'Template contains code execution patterns',
+                flag: 'CTF{SSTI_C0d3_Ex3cut10n}',
+                warning: 'Template injection detected'
+            });
+        }
+
+        // Simple template replacement (still shows concept)
+        const rendered = template.replace(/{{name}}/g, name);
+        res.json({ success: true, rendered });
+    } catch (error) {
+        res.status(500).json({ error: 'Template rendering failed', details: error.message });
+    }
+});
+
+// A13: JWT Token Manipulation
+const JWT_SECRET = 'weak_secret_key';
+
+app.post('/api/auth/jwt-login', (req, res) => {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Credentials required' });
+    }
+
+    // Vulnerable JWT implementation with weak secret
+    const token = jwt.sign({ username, role: 'user', admin: false }, JWT_SECRET);
+    
+    res.json({
+        success: true,
+        token,
+        message: 'JWT token generated with weak secret',
+        hint: 'Try modifying the token claims or cracking the secret'
+    });
+});
+
+app.get('/api/auth/jwt-verify', (req, res) => {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+        return res.status(401).json({ error: 'Token required' });
+    }
+
+    try {
+        // Vulnerable: accepts "none" algorithm
+        const decoded = jwt.decode(token, { complete: true });
+        
+        if (decoded.header.alg === 'none' || decoded.payload.admin === true) {
+            return res.json({
+                success: true,
+                message: 'Admin access granted!',
+                flag: 'CTF{JWT_T0k3n_M4n1pul4t10n}',
+                user: decoded.payload
+            });
+        }
+
+        const verified = jwt.verify(token, JWT_SECRET);
+        res.json({ success: true, user: verified });
+    } catch (error) {
+        res.status(401).json({ error: 'Invalid token', details: error.message });
+    }
+});
+
+// A14: Race Condition Vulnerability
+const raceConditionBalances = { player: 1000 };
+
+app.post('/api/race-withdraw', isAuthenticated, (req, res) => {
+    const { amount = 100 } = req.body;
+    const username = req.session.user.username;
+    
+    if (!raceConditionBalances[username]) {
+        raceConditionBalances[username] = 1000;
+    }
+
+    // Vulnerable: no atomic operation or locking
+    setTimeout(() => {
+        if (raceConditionBalances[username] >= amount) {
+            raceConditionBalances[username] -= amount;
+            
+            const flag = raceConditionBalances[username] < 0 ? 'CTF{R4c3_C0nd1t10n_Expl01t}' : null;
+            
+            res.json({
+                success: true,
+                withdrawn: amount,
+                balance: raceConditionBalances[username],
+                flag
+            });
+        } else {
+            res.status(400).json({ error: 'Insufficient balance' });
+        }
+    }, 100);
+});
+
+// A15: NoSQL Injection (MongoDB simulation)
+app.post('/api/nosql-login', (req, res) => {
+    const { username, password } = req.body;
+    
+    // Vulnerable: accepts objects that bypass authentication
+    if (typeof username === 'object' || typeof password === 'object') {
+        return res.json({
+            success: true,
+            message: 'NoSQL injection successful - authentication bypassed',
+            flag: 'CTF{N0SQL_1nj3ct10n_Byp4ss}',
+            user: { username: 'admin', role: 'admin' }
+        });
+    }
+
+    res.status(401).json({ error: 'Invalid credentials' });
+});
+
+// A16: GraphQL Introspection & Query Depth Attack
+app.post('/api/graphql', isAuthenticated, (req, res) => {
+    const { query } = req.body;
+    
+    if (!query) {
+        return res.status(400).json({ error: 'GraphQL query required' });
+    }
+
+    // Detect introspection query
+    if (query.includes('__schema') || query.includes('__type')) {
+        return res.json({
+            success: true,
+            message: 'GraphQL introspection exposed',
+            flag: 'CTF{Gr4phQL_Intr0sp3ct10n}',
+            schema: {
+                types: ['User', 'Post', 'Secret'],
+                queries: ['users', 'posts', 'secrets']
+            }
+        });
+    }
+
+    // Detect deeply nested query (DoS)
+    const depth = (query.match(/{/g) || []).length;
+    if (depth > 10) {
+        return res.json({
+            success: true,
+            message: 'Deep query detected - potential DoS',
+            flag: 'CTF{Gr4phQL_D3pth_Att4ck}',
+            depth
+        });
+    }
+
+    res.json({ success: true, data: 'Query executed' });
+});
+
+// A17: WebSocket Message Injection
+app.get('/api/websocket-demo', isAuthenticated, (req, res) => {
+    res.json({
+        success: true,
+        endpoint: 'ws://localhost:5000/ws',
+        message: 'WebSocket endpoint available',
+        hint: 'Send malicious payloads without proper validation',
+        flag: 'CTF{W3bS0ck3t_1nj3ct10n}'
+    });
+});
+
+// A18: HTTP Request Smuggling
+app.post('/api/smuggle-request', (req, res) => {
+    const contentLength = req.headers['content-length'];
+    const transferEncoding = req.headers['transfer-encoding'];
+    
+    // Detect conflicting headers
+    if (contentLength && transferEncoding) {
+        return res.json({
+            success: true,
+            message: 'Request smuggling detected - conflicting headers',
+            flag: 'CTF{HTTP_R3qu3st_Smuggl1ng}',
+            headers: { contentLength, transferEncoding }
+        });
+    }
+
+    res.json({ success: true, message: 'Request processed' });
+});
+
+// A19: API Rate Limiting Bypass
+const apiCallCounts = {};
+
+app.get('/api/rate-limit-test', (req, res) => {
+    const clientId = req.headers['x-client-id'] || req.ip;
+    
+    if (!apiCallCounts[clientId]) {
+        apiCallCounts[clientId] = 0;
+    }
+
+    apiCallCounts[clientId]++;
+
+    // Vulnerable: can be bypassed by changing X-Client-Id header
+    if (apiCallCounts[clientId] > 100 && req.headers['x-client-id']) {
+        return res.json({
+            success: true,
+            message: 'Rate limiting bypassed with custom header',
+            flag: 'CTF{R4t3_L1m1t_Byp4ss}',
+            calls: apiCallCounts[clientId]
+        });
+    }
+
+    res.json({ success: true, calls: apiCallCounts[clientId] });
+});
+
+// A20: Mass Assignment Vulnerability
+app.post('/api/user-update', isAuthenticated, (req, res) => {
+    const updates = req.body;
+    
+    // Vulnerable: accepts any field without validation
+    if (updates.role === 'admin' || updates.isAdmin === true) {
+        return res.json({
+            success: true,
+            message: 'Mass assignment exploit - role escalation achieved',
+            flag: 'CTF{M4ss_Ass1gnm3nt_R0l3_Esc}',
+            user: { ...req.session.user, ...updates }
+        });
+    }
+
+    res.json({ success: true, message: 'User updated', updates });
+});
+
 app.get('/', (req, res) => {
     res.render('index', {
         user: req.session.user,
@@ -1070,6 +1339,106 @@ function getCTFChallenges() {
             endpoint: '/blackbox',
             flag: 'CTF{Bl4ckB0x_Exp10r3r}',
             solved: false
+        },
+        {
+            id: 12,
+            name: 'XML External Entity (XXE)',
+            vulnerability: 'A11: XML External Entity',
+            difficulty: 'Medium',
+            description: 'Exploit XXE to read local files through XML parsing.',
+            endpoint: '/api/xml-parser',
+            flag: 'CTF{XXE_F1l3_R34d_Succ3ss}',
+            solved: false
+        },
+        {
+            id: 13,
+            name: 'Server-Side Template Injection',
+            vulnerability: 'A12: SSTI',
+            difficulty: 'Hard',
+            description: 'Inject code into server-side templates for remote code execution.',
+            endpoint: '/api/render-template',
+            flag: 'CTF{SSTI_C0d3_Ex3cut10n}',
+            solved: false
+        },
+        {
+            id: 14,
+            name: 'JWT Token Manipulation',
+            vulnerability: 'A13: JWT Vulnerabilities',
+            difficulty: 'Medium',
+            description: 'Manipulate JWT tokens to gain admin access through weak secrets.',
+            endpoint: '/api/auth/jwt-login',
+            flag: 'CTF{JWT_T0k3n_M4n1pul4t10n}',
+            solved: false
+        },
+        {
+            id: 15,
+            name: 'Race Condition Attack',
+            vulnerability: 'A14: Race Conditions',
+            difficulty: 'Hard',
+            description: 'Exploit race conditions to withdraw more than available balance.',
+            endpoint: '/api/race-withdraw',
+            flag: 'CTF{R4c3_C0nd1t10n_Expl01t}',
+            solved: false
+        },
+        {
+            id: 16,
+            name: 'NoSQL Injection',
+            vulnerability: 'A15: NoSQL Injection',
+            difficulty: 'Medium',
+            description: 'Bypass authentication using NoSQL injection techniques.',
+            endpoint: '/api/nosql-login',
+            flag: 'CTF{N0SQL_1nj3ct10n_Byp4ss}',
+            solved: false
+        },
+        {
+            id: 17,
+            name: 'GraphQL Introspection',
+            vulnerability: 'A16: GraphQL Attacks',
+            difficulty: 'Medium',
+            description: 'Exploit GraphQL introspection and query depth attacks.',
+            endpoint: '/api/graphql',
+            flag: 'CTF{Gr4phQL_Intr0sp3ct10n}',
+            solved: false
+        },
+        {
+            id: 18,
+            name: 'WebSocket Injection',
+            vulnerability: 'A17: WebSocket Vulnerabilities',
+            difficulty: 'Medium',
+            description: 'Exploit unvalidated WebSocket messages for injection attacks.',
+            endpoint: '/api/websocket-demo',
+            flag: 'CTF{W3bS0ck3t_1nj3ct10n}',
+            solved: false
+        },
+        {
+            id: 19,
+            name: 'HTTP Request Smuggling',
+            vulnerability: 'A18: Request Smuggling',
+            difficulty: 'Hard',
+            description: 'Exploit HTTP request smuggling with conflicting headers.',
+            endpoint: '/api/smuggle-request',
+            flag: 'CTF{HTTP_R3qu3st_Smuggl1ng}',
+            solved: false
+        },
+        {
+            id: 20,
+            name: 'Rate Limiting Bypass',
+            vulnerability: 'A19: Rate Limit Bypass',
+            difficulty: 'Easy',
+            description: 'Bypass API rate limiting using custom headers.',
+            endpoint: '/api/rate-limit-test',
+            flag: 'CTF{R4t3_L1m1t_Byp4ss}',
+            solved: false
+        },
+        {
+            id: 21,
+            name: 'Mass Assignment Exploit',
+            vulnerability: 'A20: Mass Assignment',
+            difficulty: 'Medium',
+            description: 'Exploit mass assignment to escalate privileges.',
+            endpoint: '/api/user-update',
+            flag: 'CTF{M4ss_Ass1gnm3nt_R0l3_Esc}',
+            solved: false
         }
     ];
 }
@@ -1120,6 +1489,19 @@ const startServer = (port = process.env.PORT || 5000) => {
    ✅ POST /reset-password   - Password reset (Weak authentication)
    ✅ GET  /debug            - Debug info (Information Exposure)
    ✅ GET  /logout           - Logout
+
+🚀 Advanced Red Team Challenges:
+   ✅ POST /api/xml-parser          - XXE Attack Lab
+   ✅ POST /api/render-template     - SSTI Exploitation
+   ✅ POST /api/auth/jwt-login      - JWT Token Generation
+   ✅ GET  /api/auth/jwt-verify     - JWT Manipulation Lab
+   ✅ POST /api/race-withdraw       - Race Condition Exploit
+   ✅ POST /api/nosql-login         - NoSQL Injection
+   ✅ POST /api/graphql             - GraphQL Attack Surface
+   ✅ GET  /api/websocket-demo      - WebSocket Vulnerabilities
+   ✅ POST /api/smuggle-request     - HTTP Request Smuggling
+   ✅ GET  /api/rate-limit-test     - Rate Limiting Bypass
+   ✅ POST /api/user-update         - Mass Assignment Exploit
 
 🔐 Default Credentials:
    👑 Admin: admin / admin123
