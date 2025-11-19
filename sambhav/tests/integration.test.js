@@ -38,7 +38,6 @@ const makeRequest = (port, options, data = null) => new Promise((resolve, reject
 
 // Test suite
 const runIntegrationTests = async (port) => {
-    const tests = [];
     let passedTests = 0;
     let failedTests = 0;
 
