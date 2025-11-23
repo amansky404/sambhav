@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Leak • Sambhav Security Lab</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="page-shell">
+        <nav class="navbar">
+            <div class="badge">🧾 Cryptographic Failure Exhibit</div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/login">Login</a>
+                <a href="/register">Register</a>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/blackbox">Black Box</a>
+                <a href="/crypto-leak" class="active">Crypto Leak</a>
+                <a href="/audit-log">Audit Log</a>
+                <a href="/debug">Debug</a>
+            </div>
+        </nav>
+
+        <header class="hero-card" style="margin-bottom:32px;">
+            <div class="hero-tag">OWASP A02 • Cryptographic Failures</div>
+            <h1 class="hero-title" style="font-size:2.2rem;">Plaintext Backup Vault</h1>
+            <p class="hero-subtitle">This "secure" archive is only base64 encoded — no encryption, no key rotation, just secrets.</p>
+            <p>Download the exposed backup, decode it in the playground below, and discuss how easily attackers can recover
+                credentials when defences stop at obfuscation.</p>
+            <div class="hero-tag" style="margin-top:18px;">🚩 Flag: <strong><%= leak.flag %></strong></div>
+        </header>
+
+        <section>
+            <h2 class="section-title">🔐 Exposed Payload</h2>
+            <div class="card data-card">
+                <p><%= leak.message %></p>
+                <p class="section-subtitle"><%= leak.note %></p>
+                <div class="data-actions">
+                    <a class="btn" href="/crypto-leak?format=json" target="_blank" rel="noopener">Download Raw JSON</a>
+                    <button class="btn secondary" type="button" id="decodeButton">Decode Inside Playground</button>
+                </div>
+                <h3 style="margin-top:24px;">Base64 Dump</h3>
+                <pre class="code-box code-scroll" id="base64Dump"><%= leak.backup %></pre>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-title">🧪 Decode Playground</h2>
+            <div class="card data-card">
+                <p>Use the interactive playground to base64 decode the archive and inspect the raw credentials. The decoded
+                    content renders exactly as an attacker would see it.</p>
+                <pre class="code-box code-scroll" id="decodedDump"><%= decodedPretty %></pre>
+                <div class="alert" id="decodeNotice" style="display:none; margin-top:20px;"></div>
+            </div>
+        </section>
+
+        <section class="alert">
+            <h3>🛡️ Hardening Discussion</h3>
+            <ul class="list-card">
+                <li>Enforce encryption at rest with strong algorithms and managed key rotation.</li>
+                <li>Store backups in hardened buckets with strict IAM rather than serving them over the primary web app.</li>
+                <li>Monitor for anomalous backup downloads and wire alerts into your incident response playbook.</li>
+            </ul>
+        </section>
+    </div>
+
+    <script>
+        const decodeButton = document.getElementById('decodeButton');
+        const base64Dump = document.getElementById('base64Dump');
+        const decodedDump = document.getElementById('decodedDump');
+        const decodeNotice = document.getElementById('decodeNotice');
+
+        const decodePayload = () => {
+            try {
+                const decoded = atob(base64Dump.textContent.trim());
+                let pretty = decoded;
+                try {
+                    const parsed = JSON.parse(decoded);
+                    pretty = JSON.stringify(parsed, null, 2);
+                } catch (err) {
+                    // leave raw
+                }
+                decodedDump.textContent = pretty;
+                decodeNotice.className = 'alert success';
+                decodeNotice.textContent = 'Decoded with atob() — remember base64 is not encryption!';
+                decodeNotice.style.display = 'block';
+            } catch (error) {
+                decodeNotice.className = 'alert error';
+                decodeNotice.textContent = 'Decoding failed. Verify the dump is valid base64.';
+                decodeNotice.style.display = 'block';
+            }
+        };
+
+        if (decodeButton) {
+            decodeButton.addEventListener('click', decodePayload);
+        }
+    </script>
+</body>
+</html>

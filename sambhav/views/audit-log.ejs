@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Log • Sambhav Security Lab</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="page-shell">
+        <nav class="navbar">
+            <div class="badge">📉 Monitoring Blind Spot</div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/login">Login</a>
+                <a href="/register">Register</a>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/blackbox">Black Box</a>
+                <a href="/crypto-leak">Crypto Leak</a>
+                <a href="/audit-log" class="active">Audit Log</a>
+                <a href="/debug">Debug</a>
+            </div>
+        </nav>
+
+        <header class="hero-card" style="margin-bottom:32px;">
+            <div class="hero-tag">OWASP A09 • Logging & Monitoring Failures</div>
+            <h1 class="hero-title" style="font-size:2.2rem;">Silent SOC Console</h1>
+            <p class="hero-subtitle">Critical alerts funnel here only to vanish. Explore how easy it is to miss hostile activity.</p>
+            <p>The cards below mirror the exposed JSON endpoint. Trigger incidents from the dashboard and watch how this UI
+                struggles to keep pace, highlighting the monitoring blind spot.</p>
+            <% if (audit.flag) { %>
+                <div class="hero-tag" style="margin-top:18px;">🚩 Flag: <strong><%= audit.flag %></strong></div>
+            <% } %>
+        </header>
+
+        <section>
+            <h2 class="section-title">📋 Alert Stream</h2>
+            <div class="card data-card">
+                <div class="data-grid" id="auditTable">
+                    <% if (audit.storedEvents && audit.storedEvents.length) { %>
+                        <% audit.storedEvents.forEach(function(event, index) { %>
+                            <article class="data-card compact">
+                                <h3>Event <%= index + 1 %></h3>
+                                <p><strong>Event:</strong> <%= event.event || 'Unknown' %></p>
+                                <p><strong>Severity:</strong> <%= event.severity || 'info' %></p>
+                                <p><strong>Received:</strong> <%= event.timestamp || 'not logged' %></p>
+                            </article>
+                        <% }); %>
+                    <% } %>
+                </div>
+                <% if (!audit.storedEvents || !audit.storedEvents.length) { %>
+                    <div class="alert" id="auditEmpty">No events recorded. Attackers can move without raising alarms.</div>
+                <% } %>
+                <div class="data-actions" style="margin-top:20px;">
+                    <button class="btn" type="button" id="refreshAudit">Refresh Feed</button>
+                    <a class="btn secondary" href="/audit-log?format=json" target="_blank" rel="noopener">View Raw Endpoint</a>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-title">🧠 Monitoring Notes</h2>
+            <div class="card data-card">
+                <p><%= audit.monitoring %></p>
+                <p class="section-subtitle">Hook your own telemetry here and compare it with the intentionally weak logging shown.</p>
+                <pre class="code-box code-scroll" id="auditJson"><%= JSON.stringify(audit, null, 2) %></pre>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const refreshAudit = document.getElementById('refreshAudit');
+        const auditJson = document.getElementById('auditJson');
+        const auditTable = document.getElementById('auditTable');
+        const auditEmpty = document.getElementById('auditEmpty');
+
+        const renderAudit = (payload) => {
+            auditJson.textContent = JSON.stringify(payload, null, 2);
+
+            if (payload.storedEvents && payload.storedEvents.length) {
+                if (!auditTable) {
+                    return;
+                }
+                auditTable.innerHTML = payload.storedEvents.map((event, index) => `
+                    <article class="data-card compact">
+                        <h3>Event ${index + 1}</h3>
+                        <p><strong>Event:</strong> ${event.event || 'Unknown'}</p>
+                        <p><strong>Severity:</strong> ${event.severity || 'info'}</p>
+                        <p><strong>Received:</strong> ${event.timestamp || 'not logged'}</p>
+                    </article>
+                `).join('');
+                if (auditEmpty) {
+                    auditEmpty.style.display = 'none';
+                }
+            } else if (auditEmpty) {
+                auditEmpty.style.display = 'block';
+                if (auditTable) {
+                    auditTable.innerHTML = '';
+                }
+            }
+        };
+
+        if (refreshAudit) {
+            refreshAudit.addEventListener('click', async () => {
+                const response = await fetch('/audit-log?format=json', {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await response.json();
+                renderAudit(data);
+            });
+        }
+    </script>
+</body>
+</html>
