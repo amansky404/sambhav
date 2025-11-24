@@ -15,6 +15,9 @@
                 <a href="/">Home</a>
                 <a href="/blackbox">Black Box</a>
                 <a href="/admin">Admin</a>
+                <a href="/crypto-leak">Crypto Leak</a>
+                <a href="/audit-log">Audit Log</a>
+                <a href="/debug">Debug</a>
                 <a href="/profile/<%= user.id %>">Profile</a>
                 <a href="/logout">Logout</a>
             </div>
@@ -56,6 +59,19 @@
                                 <p><%= module.mitigation %></p>
                             </div>
                         </div>
+                        <% if (module.patchChoices && module.patchChoices.length) { %>
+                        <div class="learning-block">
+                            <h4>Patch picker</h4>
+                            <p class="learning-helper">Choose one of the proposed remediations to auto-fill the playground or review anti-patterns.</p>
+                            <select class="patch-select" data-module-id="<%= module.id %>">
+                                <option value="">Select a patch idea (A-D)</option>
+                                <% module.patchChoices.forEach(function(choice) { %>
+                                    <option value="<%= choice.key %>" data-snippet="<%= encodeURIComponent(choice.snippet) %>" data-description="<%= encodeURIComponent(choice.description) %>">Option <%= choice.key %>: <%= choice.title %></option>
+                                <% }); %>
+                            </select>
+                            <p class="patch-choice-description" data-module-id="<%= module.id %>" style="display:none;"></p>
+                        </div>
+                        <% } %>
                         <div class="learning-block">
                             <h4>Patch playground</h4>
                             <p class="learning-helper">Write or paste a fix. When you check your work we will look for the secure building blocks described above.</p>
@@ -340,6 +356,44 @@
                 } catch (error) {
                     feedback.className = 'alert patch-feedback error';
                     feedback.textContent = 'We could not evaluate your patch. Try again.';
+                }
+            });
+        });
+
+        const patchSelects = document.querySelectorAll('.patch-select');
+        patchSelects.forEach((select) => {
+            select.addEventListener('change', () => {
+                const moduleId = select.dataset.moduleId;
+                const selectedOption = select.selectedOptions[0];
+                const textarea = document.querySelector(`.patch-input[data-module-id="${moduleId}"]`);
+                const feedback = document.querySelector(`.patch-feedback[data-module-id="${moduleId}"]`);
+                const description = document.querySelector(`.patch-choice-description[data-module-id="${moduleId}"]`);
+
+                if (feedback) {
+                    feedback.style.display = 'none';
+                }
+
+                if (!selectedOption) {
+                    if (description) {
+                        description.style.display = 'none';
+                    }
+                    return;
+                }
+
+                const snippet = selectedOption.dataset.snippet ? decodeURIComponent(selectedOption.dataset.snippet) : '';
+                const detail = selectedOption.dataset.description ? decodeURIComponent(selectedOption.dataset.description) : '';
+
+                if (textarea && snippet) {
+                    textarea.value = snippet;
+                }
+
+                if (description) {
+                    if (selectedOption.value && detail) {
+                        description.textContent = `Option ${selectedOption.value}: ${detail}`;
+                        description.style.display = 'block';
+                    } else {
+                        description.style.display = 'none';
+                    }
                 }
             });
         });
